@@ -48,52 +48,111 @@ const generateId = () => {
   return 'id_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
 };
 
-interface ErrorBoundaryProps {
-  children: React.ReactNode;
+// Error Handling Spec for Firestore
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
 }
 
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: any;
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
 }
 
 // Error Boundary Component
-class ErrorBoundary extends Component<any, any> {
-  constructor(props: any) {
+class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
+  constructor(props: { children: React.ReactNode }) {
     super(props);
-    (this as any).state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: any): ErrorBoundaryState {
+  static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: any, errorInfo: any) {
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
-  }
-
   render() {
-    if ((this as any).state.hasError) {
+    if (this.state.hasError) {
+      let errorMessage = "Qualcosa è andato storto.";
+      try {
+        const parsed = JSON.parse(this.state.error.message);
+        if (parsed.error.includes('Missing or insufficient permissions')) {
+          errorMessage = "Errore di autorizzazione: non hai i permessi per accedere a questi dati.";
+        } else if (parsed.error.includes('client is offline')) {
+          errorMessage = "Errore di connessione: controlla la tua rete o la configurazione Firebase.";
+        }
+      } catch (e) {
+        errorMessage = this.state.error.message || errorMessage;
+      }
+
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-black p-6 text-center">
-          <h2 className="text-[#D4AF37] text-xl font-bold mb-4">Qualcosa è andato storto</h2>
-          <p className="text-ivory/60 text-sm mb-6 max-w-xs">{(this as any).state.error?.message || "Errore sconosciuto"}</p>
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-6 border border-red-500/30">
+            <TrendingDown className="text-red-500" size={32} />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-4">Ops! Errore di Sistema</h1>
+          <p className="text-muted text-sm max-w-xs mb-8 leading-relaxed">
+            {errorMessage}
+          </p>
           <button 
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-[#D4AF37] text-black rounded-xl font-bold"
+            className="px-8 py-3 bg-gold-bright text-black font-bold rounded-xl active:scale-95 transition-all"
           >
             Ricarica App
           </button>
+          <p className="mt-8 text-[8px] text-muted/50 font-mono break-all max-w-md">
+            {this.state.error?.message}
+          </p>
         </div>
       );
     }
-    return (this as any).props.children;
+    return this.props.children;
   }
 }
 
 const DAY_NAMES = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
-export default function App() {
+function App() {
   const [user, setUser] = useState<User | null>(null);
   const [deviceId, setDeviceId] = useState<string | null>(() => {
     try {
@@ -107,7 +166,7 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [defaultRate, setDefaultRate] = useState<number>(5.0);
+  const [defaultRate, setDefaultRate] = useState<number>(8.0);
   const [workEntries, setWorkEntries] = useState<WorkEntry[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
 
@@ -219,19 +278,19 @@ export default function App() {
     const unsubSettings = onSnapshot(doc(db, 'users', activeId, 'settings', 'profile'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setDefaultRate(data.defaultRate || 5.0);
+        setDefaultRate(data.defaultRate || 8.0);
         setTheme(data.theme || 'dark');
-        setWorkRate(data.defaultRate?.toString() || '5');
+        setWorkRate(data.defaultRate?.toString() || '8');
       } else {
         // Create default settings
         setDoc(doc(db, 'users', activeId, 'settings', 'profile'), {
-          defaultRate: 5.0,
+          defaultRate: 8.0,
           theme: 'dark'
-        }).catch(err => console.error("Error creating settings:", err));
-        setWorkRate('5');
+        }).catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${activeId}/settings/profile`));
+        setWorkRate('8');
       }
     }, (error) => {
-      console.error("Settings listener error:", error);
+      handleFirestoreError(error, OperationType.GET, `users/${activeId}/settings/profile`);
     });
 
     // Load Work Entries
@@ -244,8 +303,7 @@ export default function App() {
       setWorkEntries(entries);
       setIsDataLoading(false);
     }, (error) => {
-      console.error("Work listener error:", error);
-      setIsDataLoading(false);
+      handleFirestoreError(error, OperationType.GET, `users/${activeId}/workEntries`);
     });
 
     // Load Expenses
@@ -257,7 +315,7 @@ export default function App() {
       });
       setExpenses(exps);
     }, (error) => {
-      console.error("Expenses listener error:", error);
+      handleFirestoreError(error, OperationType.GET, `users/${activeId}/expenses`);
     });
 
     return () => {
@@ -270,24 +328,20 @@ export default function App() {
   const handleLogin = async () => {
     setAuthError(null);
     const provider = new GoogleAuthProvider();
-    
-    // Detect mobile or PWA
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const isStandalone = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches;
+    provider.setCustomParameters({ prompt: 'select_account' });
 
     try {
-      if (isMobile || isStandalone) {
-        // Use redirect for mobile/PWA as popups are often blocked
-        await signInWithRedirect(auth, provider);
-      } else {
-        await signInWithPopup(auth, provider);
-      }
+      await signInWithPopup(auth, provider);
     } catch (error: any) {
       console.error("Login error:", error);
       if (error.code === 'auth/popup-blocked') {
         setAuthError("Il browser ha bloccato il popup. Abilita i popup o prova a ricaricare.");
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setAuthError("Errore: Dominio non autorizzato nelle impostazioni Firebase.");
+      } else if (error.code === 'auth/operation-not-allowed') {
+        setAuthError("Errore: Accesso Google non abilitato in Firebase.");
       } else {
-        setAuthError("Errore durante l'accesso: " + (error.message || "Riprova più tardi."));
+        setAuthError(`Errore (${error.code || 'unknown'}): ${error.message || "Riprova più tardi."}`);
       }
     }
   };
@@ -394,8 +448,7 @@ export default function App() {
   ].sort((a, b) => b.createdAt - a.createdAt);
 
   return (
-    <ErrorBoundary>
-      <div className="marble-bg min-h-screen pb-32 font-sans text-normal">
+    <div className="marble-bg min-h-screen pb-32 font-sans text-normal">
       <div className="gold-vein top-1/4 -left-1/4" />
       <div className="gold-vein top-2/3 -right-1/4" />
       <div className="gold-vein-alt top-1/2 -left-1/3" />
@@ -910,6 +963,13 @@ export default function App() {
         </div>
       </nav>
     </div>
+  );
+}
+
+export default function AppWrapper() {
+  return (
+    <ErrorBoundary>
+      <App />
     </ErrorBoundary>
   );
 }
