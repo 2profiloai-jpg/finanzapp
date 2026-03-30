@@ -1,0 +1,21 @@
+{
+  "name": "Aureum Financial Tracker",
+  "short_name": "Aureum",
+  "description": "Financial & Work Tracker with a luxurious aesthetic.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#D4AF37",
+  "icons": [
+    {
+      "src": "https://picsum.photos/seed/gold-coin/192/192",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://picsum.photos/seed/gold-coin/512/512",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

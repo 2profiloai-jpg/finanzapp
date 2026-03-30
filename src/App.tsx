@@ -13,7 +13,8 @@ import {
   Save,
   LogOut,
   Moon,
-  Sun
+  Sun,
+  Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
