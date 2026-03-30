@@ -179,10 +179,12 @@ function App() {
   const [expCategory, setExpCategory] = useState('Materiali');
   const [expNote, setExpNote] = useState('');
   const [isDataLoading, setIsDataLoading] = useState(true);
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      setIsAuthReady(true);
       setAuthError(null);
     });
     return () => unsubscribe();
@@ -251,7 +253,7 @@ function App() {
 
   // Firestore Listeners
   useEffect(() => {
-    const activeId = user?.uid || deviceId;
+    const activeId = user?.uid;
     
     if (!activeId) {
       setIsDataLoading(false);
@@ -335,7 +337,7 @@ function App() {
   };
 
   const handleSaveSettings = async (newRate: number, newTheme: 'light' | 'dark') => {
-    const activeId = user?.uid || deviceId;
+    const activeId = user?.uid;
     if (!activeId) return;
     setDefaultRate(newRate);
     setTheme(newTheme);
@@ -349,7 +351,7 @@ function App() {
 
   const handleSaveWork = async (e: React.FormEvent) => {
     e.preventDefault();
-    const activeId = user?.uid || deviceId;
+    const activeId = user?.uid;
     if (!activeId || !workHours || !workRate) return;
     
     const id = generateId();
@@ -377,7 +379,7 @@ function App() {
 
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    const activeId = user?.uid || deviceId;
+    const activeId = user?.uid;
     if (!activeId || !expAmount) return;
 
     const id = generateId();
@@ -403,17 +405,54 @@ function App() {
   };
 
   const handleDelete = async (id: string, type: 'work' | 'expense') => {
-    const activeId = user?.uid || deviceId;
+    const activeId = user?.uid;
     if (!activeId) return;
     const collectionName = type === 'work' ? 'workEntries' : 'expenses';
     await deleteDoc(doc(db, 'users', activeId, collectionName, id));
   };
 
-  if (!deviceId) {
+  if (!isAuthReady) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-black gap-4">
         <div className="w-12 h-12 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-[#D4AF37]/60 text-xs uppercase tracking-widest">Inizializzazione...</p>
+        <p className="text-[#D4AF37]/60 text-xs uppercase tracking-widest">Aureum...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="marble-bg min-h-screen font-sans text-normal flex flex-col items-center justify-center p-6">
+        <div className="gold-vein top-[20%] -left-[10%]" />
+        <div className="gold-vein top-[70%] -right-[20%]" />
+        <div className="gold-vein-alt top-[40%] -left-[20%]" />
+        <div className="gold-vein-alt top-[10%] -right-[10%]" />
+        <div className="gold-vein top-[85%] -left-[30%]" />
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card p-8 max-w-sm w-full text-center relative z-10"
+        >
+          <div className="w-16 h-16 mx-auto rounded-full border border-gold-bright/30 flex items-center justify-center bg-gold-bright/10 mb-6">
+            <Briefcase className="w-8 h-8 text-gold-bright" />
+          </div>
+          <h1 className="text-2xl uppercase tracking-[0.3em] text-gold-bright font-medium mb-2">Aureum</h1>
+          <p className="text-sm text-muted mb-8">Premium Financial Tracker</p>
+          
+          {authError && (
+            <div className="mb-6 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-xs text-left">
+              {authError}
+            </div>
+          )}
+
+          <button 
+            onClick={handleLogin}
+            className="w-full py-4 bg-gradient-to-r from-gold-dark via-gold-bright to-gold-champagne text-black font-bold rounded-xl gold-glow active:scale-95 transition-all flex items-center justify-center gap-3"
+          >
+            <LogIn size={20} /> Accedi con Google
+          </button>
+        </motion.div>
       </div>
     );
   }
