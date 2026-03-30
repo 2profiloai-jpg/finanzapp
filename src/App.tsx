@@ -22,6 +22,8 @@ import { WorkEntry, Expense, View } from './types';
 import { auth, db } from './firebase';
 import { 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   onAuthStateChanged, 
   User,
@@ -42,6 +44,7 @@ const DAY_NAMES = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [view, setView] = useState<View>('dashboard');
   
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -59,6 +62,31 @@ export default function App() {
   const [expAmount, setExpAmount] = useState<string>('');
   const [expCategory, setExpCategory] = useState('Materiali');
   const [expNote, setExpNote] = useState('');
+  const [isDataLoading, setIsDataLoading] = useState(true);
+
+  // Persistence: Load form data from localStorage
+  useEffect(() => {
+    const savedWorkHours = localStorage.getItem('draft_workHours');
+    const savedWorkNote = localStorage.getItem('draft_workNote');
+    const savedExpAmount = localStorage.getItem('draft_expAmount');
+    const savedExpNote = localStorage.getItem('draft_expNote');
+
+    if (savedWorkHours) setWorkHours(savedWorkHours);
+    if (savedWorkNote) setWorkNote(savedWorkNote);
+    if (savedExpAmount) setExpAmount(savedExpAmount);
+    if (savedExpNote) setExpNote(savedExpNote);
+  }, []);
+
+  // Persistence: Save form data to localStorage
+  useEffect(() => {
+    localStorage.setItem('draft_workHours', workHours);
+    localStorage.setItem('draft_workNote', workNote);
+  }, [workHours, workNote]);
+
+  useEffect(() => {
+    localStorage.setItem('draft_expAmount', expAmount);
+    localStorage.setItem('draft_expNote', expNote);
+  }, [expAmount, expNote]);
 
   // Auth Listener
   useEffect(() => {
@@ -66,6 +94,13 @@ export default function App() {
       setUser(currentUser);
       setIsAuthReady(true);
     });
+
+    // Check for redirect result
+    getRedirectResult(auth).catch((error) => {
+      console.error("Redirect error:", error);
+      setLoginError("Errore durante l'accesso. Riprova.");
+    });
+
     return () => unsubscribe();
   }, []);
 
@@ -76,7 +111,12 @@ export default function App() {
 
   // Firestore Listeners
   useEffect(() => {
-    if (!isAuthReady || !user) return;
+    if (!isAuthReady || !user) {
+      setIsDataLoading(false);
+      return;
+    }
+
+    setIsDataLoading(true);
 
     // Load Settings
     const unsubSettings = onSnapshot(doc(db, 'users', user.uid, 'settings', 'profile'), (docSnap) => {
@@ -90,9 +130,11 @@ export default function App() {
         setDoc(doc(db, 'users', user.uid, 'settings', 'profile'), {
           defaultRate: 5.0,
           theme: 'dark'
-        });
+        }).catch(err => console.error("Error creating settings:", err));
         setWorkRate('5');
       }
+    }, (error) => {
+      console.error("Settings listener error:", error);
     });
 
     // Load Work Entries
@@ -103,6 +145,10 @@ export default function App() {
         entries.push(doc.data() as WorkEntry);
       });
       setWorkEntries(entries);
+      setIsDataLoading(false);
+    }, (error) => {
+      console.error("Work listener error:", error);
+      setIsDataLoading(false);
     });
 
     // Load Expenses
@@ -113,6 +159,8 @@ export default function App() {
         exps.push(doc.data() as Expense);
       });
       setExpenses(exps);
+    }, (error) => {
+      console.error("Expenses listener error:", error);
     });
 
     return () => {
@@ -123,11 +171,27 @@ export default function App() {
   }, [user, isAuthReady]);
 
   const handleLogin = async () => {
+    setLoginError(null);
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    } catch (error) {
+      
+      // Check if mobile
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        await signInWithRedirect(auth, provider);
+      } else {
+        await signInWithPopup(auth, provider);
+      }
+    } catch (error: any) {
       console.error("Login error:", error);
+      if (error.code === 'auth/popup-blocked') {
+        setLoginError("Il browser ha bloccato il popup. Abilita i popup o riprova.");
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setLoginError("Dominio non autorizzato. Controlla la configurazione Firebase.");
+      } else {
+        setLoginError("Impossibile accedere. Riprova più tardi.");
+      }
     }
   };
 
@@ -169,6 +233,8 @@ export default function App() {
     await setDoc(doc(db, 'users', user.uid, 'workEntries', id), newEntry);
     setWorkHours('');
     setWorkNote('');
+    localStorage.removeItem('draft_workHours');
+    localStorage.removeItem('draft_workNote');
     setView('calendar');
   };
 
@@ -189,6 +255,8 @@ export default function App() {
     await setDoc(doc(db, 'users', user.uid, 'expenses', id), newExpense);
     setExpAmount('');
     setExpNote('');
+    localStorage.removeItem('draft_expAmount');
+    localStorage.removeItem('draft_expNote');
     setView('dashboard');
   };
 
@@ -216,7 +284,7 @@ export default function App() {
           
           <button 
             onClick={handleLogin}
-            className="w-full py-4 bg-white text-black font-medium rounded-xl flex items-center justify-center gap-3 hover:bg-gray-100 transition-colors"
+            className="w-full py-4 bg-white text-black font-medium rounded-xl flex items-center justify-center gap-3 hover:bg-gray-100 transition-colors active:scale-95"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -226,6 +294,16 @@ export default function App() {
             </svg>
             Accedi con Google
           </button>
+
+          {loginError && (
+            <motion.p 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-xs text-red-400 mt-4"
+            >
+              {loginError}
+            </motion.p>
+          )}
         </div>
       </div>
     );
@@ -252,14 +330,23 @@ export default function App() {
           <h1 className="text-sm uppercase tracking-[0.3em] text-gold-bright/80 font-medium">Aureum</h1>
           <p className="text-xs text-muted mt-1">Financial & Work Tracker</p>
         </div>
-        <div className="w-8 h-8 rounded-full overflow-hidden border border-gold-bright/30">
-          {user.photoURL ? (
-            <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          ) : (
-            <div className="w-full h-full bg-gold-bright/20 flex items-center justify-center text-gold-bright text-xs">
-              {user.email?.[0].toUpperCase()}
-            </div>
+        <div className="flex items-center gap-4">
+          {isDataLoading && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="w-4 h-4 border-2 border-gold-bright/40 border-t-gold-bright rounded-full animate-spin"
+            />
           )}
+          <div className="w-8 h-8 rounded-full overflow-hidden border border-gold-bright/30">
+            {user.photoURL ? (
+              <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <div className="w-full h-full bg-gold-bright/20 flex items-center justify-center text-gold-bright text-xs">
+                {user.email?.[0].toUpperCase()}
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
