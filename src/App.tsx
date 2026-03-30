@@ -13,12 +13,14 @@ import {
   Save,
   Moon,
   Sun,
-  Plus
+  Plus,
+  LogOut,
+  LogIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { WorkEntry, Expense, View } from './types';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { 
   collection, 
   onSnapshot, 
@@ -28,6 +30,13 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged,
+  User
+} from 'firebase/auth';
 
 // Fallback for crypto.randomUUID
 const generateId = () => {
@@ -83,6 +92,7 @@ class ErrorBoundary extends Component<any, any> {
 const DAY_NAMES = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
   const [deviceId, setDeviceId] = useState<string | null>(() => {
     try {
       return localStorage.getItem('aureum_device_id');
@@ -144,19 +154,25 @@ export default function App() {
 
   // Device ID initialization
   useEffect(() => {
-    if (!deviceId) {
+    const initializeId = async () => {
       try {
         let id = localStorage.getItem('aureum_device_id');
         if (!id) {
-          id = 'device_' + Math.random().toString(36).substring(2, 15);
+          // Generate a more secure, long unique ID
+          id = 'aur_' + Math.random().toString(36).substring(2, 15) + 
+               Math.random().toString(36).substring(2, 15) + 
+               Date.now().toString(36);
           localStorage.setItem('aureum_device_id', id);
         }
         setDeviceId(id);
       } catch (e) {
         console.error("Error initializing deviceId:", e);
-        // Fallback to memory-only ID if localStorage is blocked
         setDeviceId('mem_' + Math.random().toString(36).substring(2, 15));
       }
+    };
+    
+    if (!deviceId) {
+      initializeId();
     }
   }, [deviceId]);
 
@@ -165,9 +181,20 @@ export default function App() {
     document.body.className = theme;
   }, [theme]);
 
+  // Auth Listener
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsub();
+  }, []);
+
   // Firestore Listeners
   useEffect(() => {
-    if (!deviceId) {
+    // Use user.uid if logged in, otherwise fallback to deviceId
+    const activeId = user?.uid || deviceId;
+    
+    if (!activeId) {
       setIsDataLoading(false);
       return;
     }
@@ -175,7 +202,7 @@ export default function App() {
     setIsDataLoading(true);
 
     // Load Settings
-    const unsubSettings = onSnapshot(doc(db, 'users', deviceId, 'settings', 'profile'), (docSnap) => {
+    const unsubSettings = onSnapshot(doc(db, 'users', activeId, 'settings', 'profile'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setDefaultRate(data.defaultRate || 5.0);
@@ -183,7 +210,7 @@ export default function App() {
         setWorkRate(data.defaultRate?.toString() || '5');
       } else {
         // Create default settings
-        setDoc(doc(db, 'users', deviceId, 'settings', 'profile'), {
+        setDoc(doc(db, 'users', activeId, 'settings', 'profile'), {
           defaultRate: 5.0,
           theme: 'dark'
         }).catch(err => console.error("Error creating settings:", err));
@@ -194,7 +221,7 @@ export default function App() {
     });
 
     // Load Work Entries
-    const qWork = query(collection(db, 'users', deviceId, 'workEntries'), orderBy('createdAt', 'desc'));
+    const qWork = query(collection(db, 'users', activeId, 'workEntries'), orderBy('createdAt', 'desc'));
     const unsubWork = onSnapshot(qWork, (snapshot) => {
       const entries: WorkEntry[] = [];
       snapshot.forEach((doc) => {
@@ -208,7 +235,7 @@ export default function App() {
     });
 
     // Load Expenses
-    const qExp = query(collection(db, 'users', deviceId, 'expenses'), orderBy('createdAt', 'desc'));
+    const qExp = query(collection(db, 'users', activeId, 'expenses'), orderBy('createdAt', 'desc'));
     const unsubExp = onSnapshot(qExp, (snapshot) => {
       const exps: Expense[] = [];
       snapshot.forEach((doc) => {
@@ -224,13 +251,31 @@ export default function App() {
       unsubWork();
       unsubExp();
     };
-  }, [deviceId]);
+  }, [deviceId, user]);
+
+  const handleLogin = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Login error:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
 
   const handleSaveSettings = async (newRate: number, newTheme: 'light' | 'dark') => {
-    if (!deviceId) return;
+    const activeId = user?.uid || deviceId;
+    if (!activeId) return;
     setDefaultRate(newRate);
     setTheme(newTheme);
-    await setDoc(doc(db, 'users', deviceId, 'settings', 'profile'), {
+    await setDoc(doc(db, 'users', activeId, 'settings', 'profile'), {
       defaultRate: newRate,
       theme: newTheme
     });
@@ -240,7 +285,8 @@ export default function App() {
 
   const handleSaveWork = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!deviceId || !workHours || !workRate) return;
+    const activeId = user?.uid || deviceId;
+    if (!activeId || !workHours || !workRate) return;
     
     const id = generateId();
     const newEntry: WorkEntry = {
@@ -253,7 +299,7 @@ export default function App() {
       createdAt: Date.now()
     };
     
-    await setDoc(doc(db, 'users', deviceId, 'workEntries', id), newEntry);
+    await setDoc(doc(db, 'users', activeId, 'workEntries', id), newEntry);
     setWorkHours('');
     setWorkNote('');
     try {
@@ -267,7 +313,8 @@ export default function App() {
 
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!deviceId || !expAmount) return;
+    const activeId = user?.uid || deviceId;
+    if (!activeId || !expAmount) return;
 
     const id = generateId();
     const newExpense: Expense = {
@@ -279,7 +326,7 @@ export default function App() {
       createdAt: Date.now()
     };
 
-    await setDoc(doc(db, 'users', deviceId, 'expenses', id), newExpense);
+    await setDoc(doc(db, 'users', activeId, 'expenses', id), newExpense);
     setExpAmount('');
     setExpNote('');
     try {
@@ -292,9 +339,10 @@ export default function App() {
   };
 
   const handleDelete = async (id: string, type: 'work' | 'expense') => {
-    if (!deviceId) return;
+    const activeId = user?.uid || deviceId;
+    if (!activeId) return;
     const collectionName = type === 'work' ? 'workEntries' : 'expenses';
-    await deleteDoc(doc(db, 'users', deviceId, collectionName, id));
+    await deleteDoc(doc(db, 'users', activeId, collectionName, id));
   };
 
   if (!deviceId) {
@@ -689,6 +737,42 @@ export default function App() {
               className="space-y-8"
             >
               <h2 className="text-xl font-light text-gold-bright">Impostazioni</h2>
+
+              <section className="glass-card p-6 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-widest text-muted">Account</label>
+                  {user ? (
+                    <div className="flex items-center gap-3 p-3 bg-gold-bright/5 rounded-xl border border-gold-bright/10">
+                      {user.photoURL && (
+                        <img src={user.photoURL} alt={user.displayName || ''} className="w-10 h-10 rounded-full border border-gold-bright/30" referrerPolicy="no-referrer" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gold-bright truncate">{user.displayName}</p>
+                        <p className="text-[10px] text-muted truncate">{user.email}</p>
+                      </div>
+                      <button 
+                        onClick={handleLogout}
+                        className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                      >
+                        <LogOut size={18} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={handleLogin}
+                      className="w-full flex items-center justify-center gap-3 p-4 bg-white text-black rounded-xl font-bold active:scale-[0.98] transition-all shadow-lg"
+                    >
+                      <LogIn size={20} />
+                      Accedi con Google
+                    </button>
+                  )}
+                  <p className="text-[10px] text-muted text-center leading-relaxed mt-2">
+                    {user 
+                      ? "I tuoi dati sono sincronizzati con il tuo account Google." 
+                      : "Accedi per salvare i tuoi dati sul cloud e ritrovarli su ogni dispositivo."}
+                  </p>
+                </div>
+              </section>
 
               <section className="glass-card p-6 space-y-6">
                 <div className="space-y-2">

@@ -11,7 +11,10 @@ service cloud.firestore {
     }
     
     function isOwner(userId) {
-      return true; // Allow access without auth for simplicity as requested
+      // Allow access if the user is authenticated and matches the path,
+      // or if they are using a unique Device ID (anonymous mode).
+      return (request.auth != null && request.auth.uid == userId) || 
+             (request.auth == null && userId is string && userId.size() >= 10);
     }
     
     function hasOnlyAllowedFields(allowedFields) {
