@@ -67,32 +67,34 @@ body.light .marble-bg::before {
 /* Gold Veins Effect */
 .gold-vein {
   position: absolute;
-  background: linear-gradient(90deg, transparent, #D4AF37, transparent);
-  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.8), transparent);
+  height: 2px;
   width: 150%;
-  opacity: 0.1;
+  opacity: 0.4;
   transform: rotate(-35deg);
   pointer-events: none;
   filter: blur(1px);
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
 }
 
 body.light .gold-vein {
-  opacity: 0.3;
+  opacity: 0.6;
 }
 
 .gold-vein-alt {
   position: absolute;
-  background: linear-gradient(90deg, transparent, #F7E7CE, transparent);
-  height: 0.5px;
+  background: linear-gradient(90deg, transparent, rgba(247, 231, 206, 0.7), transparent);
+  height: 1px;
   width: 150%;
-  opacity: 0.05;
+  opacity: 0.3;
   transform: rotate(25deg);
   pointer-events: none;
+  box-shadow: 0 0 10px rgba(247, 231, 206, 0.2);
 }
 
 body.light .gold-vein-alt {
-  background: linear-gradient(90deg, transparent, #D4AF37, transparent);
-  opacity: 0.2;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.7), transparent);
+  opacity: 0.5;
 }
 
 .glass-card {

@@ -429,12 +429,14 @@ function App() {
 
   return (
     <div className="marble-bg min-h-screen font-sans text-normal">
-      <div className="max-w-md mx-auto relative min-h-screen pb-32 shadow-2xl bg-black/20">
-        <div className="gold-vein top-1/4 -left-1/4" />
-        <div className="gold-vein top-2/3 -right-1/4" />
-        <div className="gold-vein-alt top-1/2 -left-1/3" />
-        <div className="gold-vein-alt top-10 -right-1/3" />
+      {/* Sfondo: Venature dorate a tutto schermo */}
+      <div className="gold-vein top-[20%] -left-[10%]" />
+      <div className="gold-vein top-[70%] -right-[20%]" />
+      <div className="gold-vein-alt top-[40%] -left-[20%]" />
+      <div className="gold-vein-alt top-[10%] -right-[10%]" />
+      <div className="gold-vein top-[85%] -left-[30%]" />
 
+      <div className="max-w-md mx-auto relative min-h-screen pb-32 shadow-2xl bg-black/20">
         <header className="p-6 pt-12 flex justify-between items-center relative z-10">
           <div>
             <h1 className="text-sm uppercase tracking-[0.3em] text-gold-bright/80 font-medium">Aureum</h1>
