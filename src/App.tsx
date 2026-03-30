@@ -760,25 +760,35 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 h-[84px] pb-safe glass-card rounded-none border-t border-gold-bright/20 border-x-0 border-b-0 grid grid-cols-5 z-50">
-        <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<Wallet size={20} />} label="Home" />
-        <NavButton active={view === 'calendar'} onClick={() => setView('calendar')} icon={<CalendarIcon size={20} />} label="Sett." />
-        <div className="flex justify-center items-center h-full relative">
-          <button 
-            onClick={() => {
-              setWorkDay(DAY_NAMES[0]);
-              setView('add-work');
-            }}
-            className={cn(
-              "w-14 h-14 rounded-full bg-gold-bright text-white flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.4)] active:scale-95 transition-all absolute left-1/2 -translate-x-1/2 -top-6",
-              view === 'add-work' && "scale-110"
-            )}
-          >
-            <Briefcase size={24} />
-          </button>
+      <nav className="fixed bottom-0 left-0 right-0 glass-card rounded-none border-t border-gold-bright/20 border-x-0 border-b-0 z-50 pb-[env(safe-area-inset-bottom)]">
+        <div className="flex h-16 items-stretch">
+          <div className="flex-1">
+            <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<Wallet size={20} />} label="Home" />
+          </div>
+          <div className="flex-1">
+            <NavButton active={view === 'calendar'} onClick={() => setView('calendar')} icon={<CalendarIcon size={20} />} label="Sett." />
+          </div>
+          <div className="flex-1 flex justify-center items-center relative">
+            <button 
+              onClick={() => {
+                setWorkDay(DAY_NAMES[0]);
+                setView('add-work');
+              }}
+              className={cn(
+                "w-14 h-14 rounded-full bg-gold-bright text-white flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.4)] active:scale-95 transition-all absolute -top-7 left-1/2 -translate-x-1/2",
+                view === 'add-work' && "scale-110"
+              )}
+            >
+              <Briefcase size={24} />
+            </button>
+          </div>
+          <div className="flex-1">
+            <NavButton active={view === 'add-expense'} onClick={() => setView('add-expense')} icon={<Receipt size={20} />} label="Spese" />
+          </div>
+          <div className="flex-1">
+            <NavButton active={view === 'settings'} onClick={() => setView('settings')} icon={<Settings size={20} />} label="Impost." />
+          </div>
         </div>
-        <NavButton active={view === 'add-expense'} onClick={() => setView('add-expense')} icon={<Receipt size={20} />} label="Spese" />
-        <NavButton active={view === 'settings'} onClick={() => setView('settings')} icon={<Settings size={20} />} label="Impost." />
       </nav>
     </div>
     </ErrorBoundary>
@@ -790,14 +800,14 @@ function NavButton({ active, onClick, icon, label }: { active: boolean, onClick:
     <button 
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center justify-center w-full h-full gap-1 transition-all",
+        "flex flex-col items-center justify-center w-full h-full gap-0.5 transition-all",
         active ? "text-gold-bright" : "text-muted hover:text-gold-bright/70"
       )}
     >
-      <div className={cn("gold-icon-glow transition-transform flex items-center justify-center h-6", active && "scale-110")}>
+      <div className={cn("gold-icon-glow transition-transform flex items-center justify-center h-7", active && "scale-110")}>
         {icon}
       </div>
-      <span className="text-[7px] uppercase tracking-[0.2em] font-bold text-center w-full truncate px-1">{label}</span>
+      <span className="text-[9px] uppercase tracking-widest font-bold text-center w-full truncate px-0.5">{label}</span>
     </button>
   );
 }
