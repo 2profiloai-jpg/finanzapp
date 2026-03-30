@@ -1,0 +1,57 @@
+{
+  "entities": {
+    "WorkEntry": {
+      "title": "WorkEntry",
+      "description": "A record of work done on a specific day of the week.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "day": { "type": "string", "description": "Lunedì, Martedì, etc." },
+        "hours": { "type": "number" },
+        "hourlyRate": { "type": "number" },
+        "totalEarned": { "type": "number" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "day", "hours", "hourlyRate", "totalEarned", "createdAt"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "A record of an expense incurred on a specific day of the week.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "day": { "type": "string", "description": "Lunedì, Martedì, etc." },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "day", "amount", "category", "createdAt"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "User settings.",
+      "type": "object",
+      "properties": {
+        "defaultRate": { "type": "number" },
+        "theme": { "type": "string", "enum": ["light", "dark"] }
+      },
+      "required": ["defaultRate", "theme"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/workEntries/{entryId}": {
+      "schema": { "$ref": "#/entities/WorkEntry" },
+      "description": "Work entries for a specific user."
+    },
+    "/users/{userId}/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/Expense" },
+      "description": "Expenses for a specific user."
+    },
+    "/users/{userId}/settings/profile": {
+      "schema": { "$ref": "#/entities/Settings" },
+      "description": "Settings for a specific user."
+    }
+  }
+}
