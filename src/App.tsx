@@ -44,6 +44,7 @@ const DAY_NAMES = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isCheckingRedirect, setIsCheckingRedirect] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [view, setView] = useState<View>('dashboard');
   
@@ -91,15 +92,32 @@ export default function App() {
   // Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log("Auth state changed:", currentUser?.email);
       setUser(currentUser);
       setIsAuthReady(true);
     });
 
-    // Check for redirect result
-    getRedirectResult(auth).catch((error) => {
-      console.error("Redirect error:", error);
-      setLoginError("Errore durante l'accesso. Riprova.");
-    });
+    // Check for redirect result on mount
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          console.log("Redirect login success:", result.user.email);
+          setUser(result.user);
+        }
+      } catch (error: any) {
+        console.error("Redirect error details:", error);
+        if (error.code === 'auth/unauthorized-domain') {
+          setLoginError("Dominio non autorizzato. Aggiungi questo dominio alla console Firebase.");
+        } else {
+          setLoginError("Errore durante il reindirizzamento. Riprova l'accesso.");
+        }
+      } finally {
+        setIsCheckingRedirect(false);
+      }
+    };
+
+    checkRedirect();
 
     return () => unsubscribe();
   }, []);
@@ -266,8 +284,13 @@ export default function App() {
     await deleteDoc(doc(db, 'users', user.uid, collectionName, id));
   };
 
-  if (!isAuthReady) {
-    return <div className="min-h-screen flex items-center justify-center marble-bg"><div className="w-8 h-8 border-4 border-gold-bright border-t-transparent rounded-full animate-spin"></div></div>;
+  if (!isAuthReady || isCheckingRedirect) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center marble-bg gap-4">
+        <div className="w-12 h-12 border-4 border-gold-bright border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-gold-bright/60 text-xs uppercase tracking-widest animate-pulse">Verifica accesso...</p>
+      </div>
+    );
   }
 
   if (!user) {
