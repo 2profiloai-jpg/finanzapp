@@ -776,6 +776,42 @@ export default function App() {
 
               <section className="glass-card p-6 space-y-6">
                 <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-widest text-muted">Account</label>
+                  {user ? (
+                    <div className="flex items-center gap-3 p-3 bg-gold-bright/5 rounded-xl border border-gold-bright/10">
+                      {user.photoURL && (
+                        <img src={user.photoURL} alt={user.displayName || ''} className="w-10 h-10 rounded-full border border-gold-bright/30" referrerPolicy="no-referrer" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gold-bright truncate">{user.displayName}</p>
+                        <p className="text-[10px] text-muted truncate">{user.email}</p>
+                      </div>
+                      <button 
+                        onClick={handleLogout}
+                        className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                      >
+                        <LogOut size={18} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={handleLogin}
+                      className="w-full flex items-center justify-center gap-3 p-4 bg-white text-black rounded-xl font-bold active:scale-[0.98] transition-all shadow-lg"
+                    >
+                      <LogIn size={20} />
+                      Accedi con Google
+                    </button>
+                  )}
+                  <p className="text-[10px] text-muted text-center leading-relaxed mt-2">
+                    {user 
+                      ? "I tuoi dati sono sincronizzati con il tuo account Google." 
+                      : "Accedi per salvare i tuoi dati sul cloud e ritrovarli su ogni dispositivo."}
+                  </p>
+                </div>
+              </section>
+
+              <section className="glass-card p-6 space-y-6">
+                <div className="space-y-2">
                   <label className="text-xs uppercase tracking-widest text-muted">Tema Applicazione</label>
                   <div className="flex gap-4">
                     <button
