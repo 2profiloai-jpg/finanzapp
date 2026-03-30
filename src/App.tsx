@@ -20,7 +20,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { WorkEntry, Expense, View } from './types';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { 
   collection, 
   onSnapshot, 
@@ -30,6 +30,13 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
+import { 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged, 
+  GoogleAuthProvider,
+  User 
+} from 'firebase/auth';
 
 // Fallback for crypto.randomUUID
 const generateId = () => {
@@ -72,12 +79,17 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: localStorage.getItem('aureum_device_id') || undefined,
-      email: null,
-      emailVerified: undefined,
-      isAnonymous: true,
-      tenantId: null,
-      providerInfo: []
+      userId: auth?.currentUser?.uid || localStorage.getItem('aureum_device_id') || undefined,
+      email: auth?.currentUser?.email,
+      emailVerified: auth?.currentUser?.emailVerified,
+      isAnonymous: auth?.currentUser?.isAnonymous,
+      tenantId: auth?.currentUser?.tenantId,
+      providerInfo: auth?.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
     },
     operationType,
     path
@@ -139,6 +151,8 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError:
 const DAY_NAMES = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
 function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [deviceId, setDeviceId] = useState<string | null>(() => {
     try {
       return localStorage.getItem('aureum_device_id');
@@ -165,6 +179,14 @@ function App() {
   const [expCategory, setExpCategory] = useState('Materiali');
   const [expNote, setExpNote] = useState('');
   const [isDataLoading, setIsDataLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthError(null);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Persistence: Load form data from localStorage
   useEffect(() => {
@@ -229,7 +251,7 @@ function App() {
 
   // Firestore Listeners
   useEffect(() => {
-    const activeId = deviceId;
+    const activeId = user?.uid || deviceId;
     
     if (!activeId) {
       setIsDataLoading(false);
@@ -287,10 +309,33 @@ function App() {
       unsubWork();
       unsubExp();
     };
-  }, [deviceId]);
+  }, [deviceId, user]);
+
+  const handleLogin = async () => {
+    try {
+      setAuthError(null);
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (error: any) {
+      console.error("Login error:", error);
+      if (error.code === 'auth/popup-closed-by-user') {
+        setAuthError('Accesso annullato. Riprova quando sei pronto.');
+      } else {
+        setAuthError(`Errore di accesso: ${error.message}`);
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
 
   const handleSaveSettings = async (newRate: number, newTheme: 'light' | 'dark') => {
-    const activeId = deviceId;
+    const activeId = user?.uid || deviceId;
     if (!activeId) return;
     setDefaultRate(newRate);
     setTheme(newTheme);
@@ -304,7 +349,7 @@ function App() {
 
   const handleSaveWork = async (e: React.FormEvent) => {
     e.preventDefault();
-    const activeId = deviceId;
+    const activeId = user?.uid || deviceId;
     if (!activeId || !workHours || !workRate) return;
     
     const id = generateId();
@@ -332,7 +377,7 @@ function App() {
 
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    const activeId = deviceId;
+    const activeId = user?.uid || deviceId;
     if (!activeId || !expAmount) return;
 
     const id = generateId();
@@ -358,7 +403,7 @@ function App() {
   };
 
   const handleDelete = async (id: string, type: 'work' | 'expense') => {
-    const activeId = deviceId;
+    const activeId = user?.uid || deviceId;
     if (!activeId) return;
     const collectionName = type === 'work' ? 'workEntries' : 'expenses';
     await deleteDoc(doc(db, 'users', activeId, collectionName, id));
@@ -383,32 +428,33 @@ function App() {
   ].sort((a, b) => b.createdAt - a.createdAt);
 
   return (
-    <div className="marble-bg min-h-screen pb-32 font-sans text-normal">
-      <div className="gold-vein top-1/4 -left-1/4" />
-      <div className="gold-vein top-2/3 -right-1/4" />
-      <div className="gold-vein-alt top-1/2 -left-1/3" />
-      <div className="gold-vein-alt top-10 -right-1/3" />
+    <div className="marble-bg min-h-screen font-sans text-normal">
+      <div className="max-w-md mx-auto relative min-h-screen pb-32 shadow-2xl bg-black/20">
+        <div className="gold-vein top-1/4 -left-1/4" />
+        <div className="gold-vein top-2/3 -right-1/4" />
+        <div className="gold-vein-alt top-1/2 -left-1/3" />
+        <div className="gold-vein-alt top-10 -right-1/3" />
 
-      <header className="p-6 pt-12 flex justify-between items-center relative z-10">
-        <div>
-          <h1 className="text-sm uppercase tracking-[0.3em] text-gold-bright/80 font-medium">Aureum</h1>
-          <p className="text-xs text-muted mt-1">Financial & Work Tracker</p>
-        </div>
-        <div className="flex items-center gap-4">
-          {isDataLoading && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="w-4 h-4 border-2 border-gold-bright/40 border-t-gold-bright rounded-full animate-spin"
-            />
-          )}
-          <div className="w-8 h-8 rounded-full overflow-hidden border border-gold-bright/30 flex items-center justify-center bg-gold-bright/10">
-            <Briefcase className="w-4 h-4 text-gold-bright" />
+        <header className="p-6 pt-12 flex justify-between items-center relative z-10">
+          <div>
+            <h1 className="text-sm uppercase tracking-[0.3em] text-gold-bright/80 font-medium">Aureum</h1>
+            <p className="text-xs text-muted mt-1">Financial & Work Tracker</p>
           </div>
-        </div>
-      </header>
+          <div className="flex items-center gap-4">
+            {isDataLoading && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="w-4 h-4 border-2 border-gold-bright/40 border-t-gold-bright rounded-full animate-spin"
+              />
+            )}
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-gold-bright/30 flex items-center justify-center bg-gold-bright/10">
+              <Briefcase className="w-4 h-4 text-gold-bright" />
+            </div>
+          </div>
+        </header>
 
-      <main className="px-6 relative z-10">
+        <main className="px-6 relative z-10">
         <AnimatePresence mode="wait">
           {view === 'dashboard' && (
             <motion.div 
@@ -758,14 +804,53 @@ function App() {
 
               <section className="glass-card p-6 space-y-6">
                 <div className="space-y-2">
-                  <label className="text-xs uppercase tracking-widest text-muted">Salvataggio Dati</label>
-                  <div className="p-4 bg-gold-bright/5 rounded-xl border border-gold-bright/10">
-                    <p className="text-sm text-gold-bright font-medium mb-1">Dati collegati a questo dispositivo</p>
-                    <p className="text-[10px] text-muted leading-relaxed">
-                      I tuoi dati sono salvati in modo sicuro e sono visibili solo da te su questo dispositivo. 
-                      Non è richiesto alcun accesso. (Nota: se cancelli i dati del browser, potresti perdere lo storico).
-                    </p>
-                  </div>
+                  <label className="text-xs uppercase tracking-widest text-muted">Account & Sincronizzazione</label>
+                  {user ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 p-3 bg-gold-bright/10 rounded-xl border border-gold-bright/20">
+                        {user.photoURL ? (
+                          <img src={user.photoURL} alt="Profile" className="w-10 h-10 rounded-full border border-gold-bright/30" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gold-bright/20 flex items-center justify-center border border-gold-bright/30">
+                            <span className="text-gold-bright font-medium">{user.email?.[0].toUpperCase()}</span>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gold-bright truncate">{user.displayName || 'Utente'}</p>
+                          <p className="text-[10px] text-muted truncate">{user.email}</p>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-muted leading-relaxed">
+                        I tuoi dati sono sincronizzati e salvati in modo sicuro sul cloud. Puoi accedervi da qualsiasi dispositivo accedendo con questo account.
+                      </p>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full py-3 bg-red-500/10 border border-red-500/30 text-red-500 rounded-xl text-sm font-medium hover:bg-red-500/20 transition-all flex items-center justify-center gap-2"
+                      >
+                        <LogOut size={16} /> Disconnetti
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-gold-bright/5 rounded-xl border border-gold-bright/10">
+                        <p className="text-sm text-gold-bright font-medium mb-1">Modalità Dispositivo Locale</p>
+                        <p className="text-[10px] text-muted leading-relaxed">
+                          Attualmente i tuoi dati sono salvati solo su questo dispositivo. Accedi con Google per salvare i dati sul cloud e ritrovarli su altri telefoni o PC.
+                        </p>
+                      </div>
+                      {authError && (
+                        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-500">
+                          {authError}
+                        </div>
+                      )}
+                      <button
+                        onClick={handleLogin}
+                        className="w-full py-3 bg-gold-bright text-black rounded-xl text-sm font-bold hover:bg-gold-bright/90 transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(212,175,55,0.3)]"
+                      >
+                        <LogIn size={16} /> Accedi con Google
+                      </button>
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -839,7 +924,7 @@ function App() {
         </AnimatePresence>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 glass-card rounded-none border-t border-gold-bright/20 border-x-0 border-b-0 z-50 pb-[env(safe-area-inset-bottom)]">
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto glass-card rounded-none border-t border-gold-bright/20 border-x-0 border-b-0 z-50 pb-[env(safe-area-inset-bottom)]">
         <div className="flex h-16 items-stretch">
           <div className="flex-1">
             <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<Wallet size={20} />} label="Home" />
@@ -869,6 +954,7 @@ function App() {
           </div>
         </div>
       </nav>
+      </div>
     </div>
   );
 }
