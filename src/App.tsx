@@ -285,10 +285,11 @@ export default function App() {
   };
 
   if (!isAuthReady || isCheckingRedirect) {
+    console.log("Showing initial loading screen...", { isAuthReady, isCheckingRedirect });
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center marble-bg gap-4">
-        <div className="w-12 h-12 border-4 border-gold-bright border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-gold-bright/60 text-xs uppercase tracking-widest animate-pulse">Verifica accesso...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black gap-4">
+        <div className="w-12 h-12 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-[#D4AF37]/60 text-xs uppercase tracking-widest">Verifica accesso...</p>
       </div>
     );
   }

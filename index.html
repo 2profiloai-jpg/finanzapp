@@ -11,6 +11,17 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Unregister all service workers to clear potentially broken cache
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+            console.log("Service Worker unregistered for debug");
+          }
+        });
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
