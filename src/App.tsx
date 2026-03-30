@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component } from 'react';
 import { 
   Wallet, 
   Briefcase, 
@@ -29,10 +29,68 @@ import {
   orderBy
 } from 'firebase/firestore';
 
+// Fallback for crypto.randomUUID
+const generateId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'id_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+};
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: any;
+}
+
+// Error Boundary Component
+class ErrorBoundary extends Component<any, any> {
+  constructor(props: any) {
+    super(props);
+    (this as any).state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  }
+
+  render() {
+    if ((this as any).state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-black p-6 text-center">
+          <h2 className="text-[#D4AF37] text-xl font-bold mb-4">Qualcosa è andato storto</h2>
+          <p className="text-ivory/60 text-sm mb-6 max-w-xs">{(this as any).state.error?.message || "Errore sconosciuto"}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-[#D4AF37] text-black rounded-xl font-bold"
+          >
+            Ricarica App
+          </button>
+        </div>
+      );
+    }
+    return (this as any).props.children;
+  }
+}
+
 const DAY_NAMES = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
 export default function App() {
-  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [deviceId, setDeviceId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('aureum_device_id');
+    } catch (e) {
+      console.error("Error reading deviceId from localStorage:", e);
+      return null;
+    }
+  });
   const [view, setView] = useState<View>('dashboard');
   
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -67,24 +125,40 @@ export default function App() {
 
   // Persistence: Save form data to localStorage
   useEffect(() => {
-    localStorage.setItem('draft_workHours', workHours);
-    localStorage.setItem('draft_workNote', workNote);
+    try {
+      localStorage.setItem('draft_workHours', workHours);
+      localStorage.setItem('draft_workNote', workNote);
+    } catch (e) {
+      console.error("Error saving work draft to localStorage:", e);
+    }
   }, [workHours, workNote]);
 
   useEffect(() => {
-    localStorage.setItem('draft_expAmount', expAmount);
-    localStorage.setItem('draft_expNote', expNote);
+    try {
+      localStorage.setItem('draft_expAmount', expAmount);
+      localStorage.setItem('draft_expNote', expNote);
+    } catch (e) {
+      console.error("Error saving expense draft to localStorage:", e);
+    }
   }, [expAmount, expNote]);
 
   // Device ID initialization
   useEffect(() => {
-    let id = localStorage.getItem('aureum_device_id');
-    if (!id) {
-      id = 'device_' + Math.random().toString(36).substring(2, 15);
-      localStorage.setItem('aureum_device_id', id);
+    if (!deviceId) {
+      try {
+        let id = localStorage.getItem('aureum_device_id');
+        if (!id) {
+          id = 'device_' + Math.random().toString(36).substring(2, 15);
+          localStorage.setItem('aureum_device_id', id);
+        }
+        setDeviceId(id);
+      } catch (e) {
+        console.error("Error initializing deviceId:", e);
+        // Fallback to memory-only ID if localStorage is blocked
+        setDeviceId('mem_' + Math.random().toString(36).substring(2, 15));
+      }
     }
-    setDeviceId(id);
-  }, []);
+  }, [deviceId]);
 
   // Sync Theme with Body class
   useEffect(() => {
@@ -168,7 +242,7 @@ export default function App() {
     e.preventDefault();
     if (!deviceId || !workHours || !workRate) return;
     
-    const id = crypto.randomUUID();
+    const id = generateId();
     const newEntry: WorkEntry = {
       id,
       day: workDay,
@@ -182,8 +256,12 @@ export default function App() {
     await setDoc(doc(db, 'users', deviceId, 'workEntries', id), newEntry);
     setWorkHours('');
     setWorkNote('');
-    localStorage.removeItem('draft_workHours');
-    localStorage.removeItem('draft_workNote');
+    try {
+      localStorage.removeItem('draft_workHours');
+      localStorage.removeItem('draft_workNote');
+    } catch (e) {
+      console.error("Error clearing work draft from localStorage:", e);
+    }
     setView('calendar');
   };
 
@@ -191,7 +269,7 @@ export default function App() {
     e.preventDefault();
     if (!deviceId || !expAmount) return;
 
-    const id = crypto.randomUUID();
+    const id = generateId();
     const newExpense: Expense = {
       id,
       day: expDay,
@@ -204,8 +282,12 @@ export default function App() {
     await setDoc(doc(db, 'users', deviceId, 'expenses', id), newExpense);
     setExpAmount('');
     setExpNote('');
-    localStorage.removeItem('draft_expAmount');
-    localStorage.removeItem('draft_expNote');
+    try {
+      localStorage.removeItem('draft_expAmount');
+      localStorage.removeItem('draft_expNote');
+    } catch (e) {
+      console.error("Error clearing expense draft from localStorage:", e);
+    }
     setView('dashboard');
   };
 
@@ -234,7 +316,8 @@ export default function App() {
   ].sort((a, b) => b.createdAt - a.createdAt);
 
   return (
-    <div className="marble-bg min-h-screen pb-32 font-sans text-normal">
+    <ErrorBoundary>
+      <div className="marble-bg min-h-screen pb-32 font-sans text-normal">
       <div className="gold-vein top-1/4 -left-1/4" />
       <div className="gold-vein top-2/3 -right-1/4" />
       <div className="gold-vein-alt top-1/2 -left-1/3" />
@@ -675,6 +758,7 @@ export default function App() {
         <NavButton active={view === 'settings'} onClick={() => setView('settings')} icon={<Settings size={20} />} label="Impo" />
       </nav>
     </div>
+    </ErrorBoundary>
   );
 }
 
