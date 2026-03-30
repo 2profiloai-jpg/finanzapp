@@ -2,8 +2,10 @@
   "name": "Aureum Financial Tracker",
   "short_name": "Aureum",
   "description": "Premium Financial and Work Tracker",
-  "start_url": "/",
+  "start_url": ".",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#000000",
   "theme_color": "#D4AF37",
   "icons": [
@@ -11,13 +13,25 @@
       "src": "https://picsum.photos/seed/aureum/192/192",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "https://picsum.photos/seed/aureum/192/192",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "https://picsum.photos/seed/aureum/512/512",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "https://picsum.photos/seed/aureum/512/512",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

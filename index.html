@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#D4AF37" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/manifest.json?v=2" />
     <link rel="apple-touch-icon" href="https://picsum.photos/seed/aureum/192/192" />
     <title>Aureum | Financial Tracker</title>
   </head>
@@ -41,10 +41,23 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('SW Registered', reg))
+            .then(reg => {
+              console.log('SW Registered', reg);
+              // Force update check
+              reg.update();
+            })
             .catch(err => console.error('SW Registration Failed', err));
         });
       }
+
+      // Handle PWA Install Prompt
+      window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later.
+        window.deferredPrompt = e;
+        console.log('PWA Install Prompt ready');
+      });
     </script>
     <script type="module" src="/src/main.tsx"></script>
     <script>

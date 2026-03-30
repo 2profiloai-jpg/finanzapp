@@ -1,24 +1,43 @@
-self.addEventListener('install', (e) => {
+const CACHE_NAME = 'aureum-v1';
+const OFFLINE_URL = '/';
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll([OFFLINE_URL]);
+    })
+  );
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (e) => {
-  // Clean up old caches if any
-  e.waitUntil(
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          return caches.delete(cacheName);
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
         })
       );
     })
   );
 });
 
-// A fetch handler is REQUIRED for PWA installability in Chrome.
-// We keep it simple: fetch from network directly.
+// Network-first strategy for PWA compliance
 self.addEventListener('fetch', (event) => {
-  // No caching logic here to avoid the "white screen" issue on Vercel.
-  // This just passes the PWA installability check.
-  event.respondWith(fetch(event.request));
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        return caches.match(OFFLINE_URL);
+      })
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
+    })
+  );
 });

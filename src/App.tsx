@@ -731,23 +731,46 @@ export default function App() {
                     className="input-base text-xl text-gold-bright font-medium"
                   />
                 </div>
+
+                <div className="space-y-2 pt-4 border-t border-gold-bright/20">
+                  <label className="text-xs uppercase tracking-widest text-muted">Applicazione</label>
+                  <button
+                    onClick={() => {
+                      const promptEvent = (window as any).deferredPrompt;
+                      if (promptEvent) {
+                        promptEvent.prompt();
+                        promptEvent.userChoice.then((choiceResult: any) => {
+                          if (choiceResult.outcome === 'accepted') {
+                            console.log('User accepted the install prompt');
+                          }
+                          (window as any).deferredPrompt = null;
+                        });
+                      } else {
+                        alert('L\'app è già installata o il browser non supporta l\'installazione automatica. Prova dal menu di Chrome.');
+                      }
+                    }}
+                    className="w-full py-3 bg-gold-bright/10 border border-gold-bright/30 text-gold-bright rounded-xl text-sm font-medium hover:bg-gold-bright/20 transition-all"
+                  >
+                    Installa Aureum sul dispositivo
+                  </button>
+                </div>
               </section>
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 h-[88px] pb-safe glass-card rounded-none border-t border-gold-bright/20 border-x-0 border-b-0 px-6 flex items-center justify-between z-50">
+      <nav className="fixed bottom-0 left-0 right-0 h-[84px] pb-safe glass-card rounded-none border-t border-gold-bright/20 border-x-0 border-b-0 grid grid-cols-5 z-50">
         <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<Wallet size={20} />} label="Home" />
-        <NavButton active={view === 'calendar'} onClick={() => setView('calendar')} icon={<CalendarIcon size={20} />} label="Settimana" />
-        <div className="relative -top-6">
+        <NavButton active={view === 'calendar'} onClick={() => setView('calendar')} icon={<CalendarIcon size={20} />} label="Sett." />
+        <div className="flex justify-center items-center h-full relative">
           <button 
             onClick={() => {
               setWorkDay(DAY_NAMES[0]);
               setView('add-work');
             }}
             className={cn(
-              "w-14 h-14 rounded-full bg-gold-bright text-white flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.4)] active:scale-95 transition-all",
+              "w-14 h-14 rounded-full bg-gold-bright text-white flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.4)] active:scale-95 transition-all absolute left-1/2 -translate-x-1/2 -top-6",
               view === 'add-work' && "scale-110"
             )}
           >
@@ -755,7 +778,7 @@ export default function App() {
           </button>
         </div>
         <NavButton active={view === 'add-expense'} onClick={() => setView('add-expense')} icon={<Receipt size={20} />} label="Spese" />
-        <NavButton active={view === 'settings'} onClick={() => setView('settings')} icon={<Settings size={20} />} label="Impo" />
+        <NavButton active={view === 'settings'} onClick={() => setView('settings')} icon={<Settings size={20} />} label="Impost." />
       </nav>
     </div>
     </ErrorBoundary>
@@ -767,14 +790,14 @@ function NavButton({ active, onClick, icon, label }: { active: boolean, onClick:
     <button 
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center gap-1 transition-all pt-2",
+        "flex flex-col items-center justify-center w-full h-full gap-1 transition-all",
         active ? "text-gold-bright" : "text-muted hover:text-gold-bright/70"
       )}
     >
-      <div className={cn("gold-icon-glow transition-transform", active && "scale-110")}>
+      <div className={cn("gold-icon-glow transition-transform flex items-center justify-center h-6", active && "scale-110")}>
         {icon}
       </div>
-      <span className="text-[8px] uppercase tracking-widest font-medium">{label}</span>
+      <span className="text-[7px] uppercase tracking-[0.2em] font-bold text-center w-full truncate px-1">{label}</span>
     </button>
   );
 }
