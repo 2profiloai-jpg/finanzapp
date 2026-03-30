@@ -340,6 +340,8 @@ function App() {
         setAuthError("Errore: Dominio non autorizzato nelle impostazioni Firebase.");
       } else if (error.code === 'auth/operation-not-allowed') {
         setAuthError("Errore: Accesso Google non abilitato in Firebase.");
+      } else if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+        setAuthError("Accesso annullato. La finestra di login è stata chiusa prima di completare l'accesso. Riprova.");
       } else {
         setAuthError(`Errore (${error.code || 'unknown'}): ${error.message || "Riprova più tardi."}`);
       }
