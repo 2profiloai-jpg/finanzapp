@@ -20,7 +20,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { WorkEntry, Expense, View } from './types';
-import { db, auth } from './firebase';
+import { db } from './firebase';
 import { 
   collection, 
   onSnapshot, 
@@ -30,15 +30,6 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { 
-  GoogleAuthProvider, 
-  signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult,
-  signOut, 
-  onAuthStateChanged,
-  User
-} from 'firebase/auth';
 
 // Fallback for crypto.randomUUID
 const generateId = () => {
@@ -81,17 +72,12 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
+      userId: localStorage.getItem('aureum_device_id') || undefined,
+      email: null,
+      emailVerified: undefined,
+      isAnonymous: true,
+      tenantId: null,
+      providerInfo: []
     },
     operationType,
     path
@@ -153,7 +139,6 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError:
 const DAY_NAMES = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
 function App() {
-  const [user, setUser] = useState<User | null>(null);
   const [deviceId, setDeviceId] = useState<string | null>(() => {
     try {
       return localStorage.getItem('aureum_device_id');
@@ -163,7 +148,6 @@ function App() {
     }
   });
   const [view, setView] = useState<View>('dashboard');
-  const [authError, setAuthError] = useState<string | null>(null);
   
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [defaultRate, setDefaultRate] = useState<number>(8.0);
@@ -243,29 +227,9 @@ function App() {
     document.body.className = theme;
   }, [theme]);
 
-  // Auth Listener
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-
-    // Handle redirect result (for mobile)
-    getRedirectResult(auth).then((result) => {
-      if (result?.user) {
-        setUser(result.user);
-      }
-    }).catch((error) => {
-      console.error("Redirect login error:", error);
-      setAuthError("Errore durante l'accesso. Riprova.");
-    });
-
-    return () => unsub();
-  }, []);
-
   // Firestore Listeners
   useEffect(() => {
-    // Use user.uid if logged in, otherwise fallback to deviceId
-    const activeId = user?.uid || deviceId;
+    const activeId = deviceId;
     
     if (!activeId) {
       setIsDataLoading(false);
@@ -323,41 +287,10 @@ function App() {
       unsubWork();
       unsubExp();
     };
-  }, [deviceId, user]);
-
-  const handleLogin = async () => {
-    setAuthError(null);
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
-
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      console.error("Login error:", error);
-      if (error.code === 'auth/popup-blocked') {
-        setAuthError("Il browser ha bloccato il popup. Abilita i popup o prova a ricaricare.");
-      } else if (error.code === 'auth/unauthorized-domain') {
-        setAuthError("Errore: Dominio non autorizzato nelle impostazioni Firebase.");
-      } else if (error.code === 'auth/operation-not-allowed') {
-        setAuthError("Errore: Accesso Google non abilitato in Firebase.");
-      } else if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-        setAuthError("Accesso annullato. La finestra di login è stata chiusa prima di completare l'accesso. Riprova.");
-      } else {
-        setAuthError(`Errore (${error.code || 'unknown'}): ${error.message || "Riprova più tardi."}`);
-      }
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
-  };
+  }, [deviceId]);
 
   const handleSaveSettings = async (newRate: number, newTheme: 'light' | 'dark') => {
-    const activeId = user?.uid || deviceId;
+    const activeId = deviceId;
     if (!activeId) return;
     setDefaultRate(newRate);
     setTheme(newTheme);
@@ -371,7 +304,7 @@ function App() {
 
   const handleSaveWork = async (e: React.FormEvent) => {
     e.preventDefault();
-    const activeId = user?.uid || deviceId;
+    const activeId = deviceId;
     if (!activeId || !workHours || !workRate) return;
     
     const id = generateId();
@@ -399,7 +332,7 @@ function App() {
 
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    const activeId = user?.uid || deviceId;
+    const activeId = deviceId;
     if (!activeId || !expAmount) return;
 
     const id = generateId();
@@ -425,7 +358,7 @@ function App() {
   };
 
   const handleDelete = async (id: string, type: 'work' | 'expense') => {
-    const activeId = user?.uid || deviceId;
+    const activeId = deviceId;
     if (!activeId) return;
     const collectionName = type === 'work' ? 'workEntries' : 'expenses';
     await deleteDoc(doc(db, 'users', activeId, collectionName, id));
@@ -825,42 +758,14 @@ function App() {
 
               <section className="glass-card p-6 space-y-6">
                 <div className="space-y-2">
-                  <label className="text-xs uppercase tracking-widest text-muted">Account</label>
-                  {authError && (
-                    <div className="p-3 bg-red-400/10 border border-red-400/30 rounded-xl text-[10px] text-red-400 text-center">
-                      {authError}
-                    </div>
-                  )}
-                  {user ? (
-                    <div className="flex items-center gap-3 p-3 bg-gold-bright/5 rounded-xl border border-gold-bright/10">
-                      {user.photoURL && (
-                        <img src={user.photoURL} alt={user.displayName || ''} className="w-10 h-10 rounded-full border border-gold-bright/30" referrerPolicy="no-referrer" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-gold-bright truncate">{user.displayName}</p>
-                        <p className="text-[10px] text-muted truncate">{user.email}</p>
-                      </div>
-                      <button 
-                        onClick={handleLogout}
-                        className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                      >
-                        <LogOut size={18} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button 
-                      onClick={handleLogin}
-                      className="w-full flex items-center justify-center gap-3 p-4 bg-white text-black rounded-xl font-bold active:scale-[0.98] transition-all shadow-lg"
-                    >
-                      <LogIn size={20} />
-                      Accedi con Google
-                    </button>
-                  )}
-                  <p className="text-[10px] text-muted text-center leading-relaxed mt-2">
-                    {user 
-                      ? "I tuoi dati sono sincronizzati con il tuo account Google." 
-                      : "Accedi per salvare i tuoi dati sul cloud e ritrovarli su ogni dispositivo."}
-                  </p>
+                  <label className="text-xs uppercase tracking-widest text-muted">Salvataggio Dati</label>
+                  <div className="p-4 bg-gold-bright/5 rounded-xl border border-gold-bright/10">
+                    <p className="text-sm text-gold-bright font-medium mb-1">Dati collegati a questo dispositivo</p>
+                    <p className="text-[10px] text-muted leading-relaxed">
+                      I tuoi dati sono salvati in modo sicuro e sono visibili solo da te su questo dispositivo. 
+                      Non è richiesto alcun accesso. (Nota: se cancelli i dati del browser, potresti perdere lo storico).
+                    </p>
+                  </div>
                 </div>
               </section>
 
