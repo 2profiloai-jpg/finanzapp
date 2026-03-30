@@ -11,7 +11,7 @@ service cloud.firestore {
     }
     
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return true; // Allow access without auth for simplicity as requested
     }
     
     function hasOnlyAllowedFields(allowedFields) {
