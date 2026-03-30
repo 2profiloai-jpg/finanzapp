@@ -10,7 +10,7 @@ let auth;
 try {
   console.log("Initializing Firebase...");
   app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
+  db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
   auth = getAuth(app);
   console.log("Firebase initialized successfully");
 } catch (error) {

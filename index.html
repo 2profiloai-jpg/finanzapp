@@ -10,17 +10,40 @@
     <title>Aureum | Financial Tracker</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: black; color: #D4AF37; font-family: sans-serif;">
+        <div style="text-align: center;">
+          <div style="width: 40px; height: 40px; border: 3px solid #D4AF37; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+          <p style="letter-spacing: 0.2em; font-size: 12px; text-transform: uppercase; opacity: 0.8;">Aureum is loading...</p>
+        </div>
+      </div>
+    </div>
+    <style>
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
     <script>
-      // Unregister all service workers to clear potentially broken cache
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-            registration.unregister();
-            console.log("Service Worker unregistered for debug");
+      console.log("Index.html script executing...");
+      window.addEventListener('DOMContentLoaded', () => {
+        console.log("DOM fully loaded and parsed");
+      });
+      window.addEventListener('load', () => {
+        console.log("Window fully loaded");
+        // Check if app loaded after 5 seconds
+        setTimeout(() => {
+          if (!window.AUREUM_LOADED) {
+            console.error("App failed to load within 5 seconds");
+            const root = document.getElementById('root');
+            if (root && root.innerHTML.includes('Aureum is loading...')) {
+              root.innerHTML = `<div style="padding: 20px; color: white; background: #000; font-family: sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                <h2 style="color: #D4AF37;">Errore di caricamento</h2>
+                <p style="opacity: 0.7; max-width: 400px; margin: 20px 0;">L'applicazione sta impiegando troppo tempo a caricarsi. Potrebbe esserci un errore nel bundle JavaScript o nella connessione al database.</p>
+                <div style="font-size: 10px; opacity: 0.5; margin-bottom: 20px;">Timeout: 5000ms</div>
+                <button onclick="location.reload()" style="padding: 12px 24px; background: #D4AF37; border: none; border-radius: 8px; color: black; font-weight: bold; cursor: pointer;">Ricarica App</button>
+              </div>`;
+            }
           }
-        });
-      }
+        }, 5000);
+      });
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>

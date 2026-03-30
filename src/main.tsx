@@ -47,3 +47,5 @@ root.render(
     <App />
   </StrictMode>,
 );
+(window as any).AUREUM_LOADED = true;
+console.log("App mounted successfully");
